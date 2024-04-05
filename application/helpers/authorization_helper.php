@@ -2,27 +2,36 @@
 
 class AUTHORIZATION
 {
-    public static function validateTimestamp($token)
+    protected $CI; // Instance of CodeIgniter (injected through constructor)
+
+    public function __construct($CI)
     {
-        $date = date("Y-m-d h:i:s", time()); 
-        $CI = &get_instance();
-        $token = self::validateToken($token);
-            
-        if ($token != false && (strtotime($date) - strtotime($token->timestamp) < ($CI->config->item('token_expire_time') * 60))) {
+        $this->CI = $CI;
+    }
+
+    public function validateTimestamp($token)
+    {
+        $date = date("Y-m-d h:i:s", time());
+        $token = $this->validateToken($token);
+
+        if ($token != false && (strtotime($date) - strtotime($token->timestamp) < ($this->CI->config->item('token_expire_time') * 60))) {
             return $token;
         }
         return false;
     }
 
-    public static function validateToken($token)
+    public function validateToken($token)
     {
-        $CI = &get_instance();
-        return JWT::decode($token, $CI->config->item('jwt_key'));
+        try {
+            return JWT::decode($token, $this->CI->config->item('jwt_key'));
+        } catch (Exception $e) {
+            // Handle decode exception (e.g., return false or throw a specific exception)
+            return false;
+        }
     }
 
-    public static function generateToken($data)
+    public function generateToken($data)
     {
-        $CI = &get_instance();
-        return JWT::encode($data, $CI->config->item('jwt_key'));
+        return JWT::encode($data, $this->CI->config->item('jwt_key'));
     }
 }
