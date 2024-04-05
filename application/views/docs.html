@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 	<meta charset="UTF-8">
-	<title>Api-Rest</title>
+	<title>API REST</title>
 
 	<!-- Style -->
 	<link href='http://fonts.googleapis.com/earlyaccess/nanumgothic.css' rel='stylesheet' type='text/css'>
@@ -375,8 +375,8 @@
 									<label>URL Parameter</label>
 									<?php foreach($api_item['url_parameter'] as $url_parameter_item): ?>
 										<div class="row">
-											<div class="col-lg-3"><p class="ico-circle-none"></p><?= '{' . $url_parameter_item . '}' ?></div>
-											<div class="col-lg-9">
+											<div class="col-sm-3 col-lg-3"><p class="ico-circle-none"></p><?= '{' . $url_parameter_item . '}' ?></div>
+											<div class="col-sm-9 col-lg-9">
 												<input type="text" value="" />
 											</div>
 										</div>
@@ -388,8 +388,8 @@
 									<label>Parameter</label>
 									<?php foreach($api_item['parameter'] as $parameter_item): ?>
 										<div class="row">
-											<div class="col-lg-3"><p class="ico-circle"></p><?= $parameter_item ?></div>
-											<div class="col-lg-9">
+											<div class="col-sm-3 col-lg-3"><p class="ico-circle"></p><?= $parameter_item ?></div>
+											<div class="col-sm-9 col-lg-9">
 												<input type="text" value="" />
 											</div>
 										</div>
@@ -401,8 +401,8 @@
 									<label>Header</label>
 									<?php foreach($api_item['header'] as $header_item): ?>
 										<div class="row">
-											<div class="col-lg-3"><p class="ico-circle-none"></p><?= $header_item ?></div>
-											<div class="col-lg-9">
+											<div class="col-sm-3 col-lg-3"><p class="ico-circle-none"></p><?= $header_item ?></div>
+											<div class="col-sm-9 col-lg-9">
 												<input type="text" value="" />
 											</div>
 										</div>
@@ -431,12 +431,12 @@
 			</a>
 		</div>
 		<div class="footer-content-area row">
-			<div class="code-area request col-md-6">
+			<div class="code-area request col-xs-6 col-md-6">
 				<div class="description">api request</div>
 				<pre class="code-wrap">
 				</pre>
 			</div>
-			<div class="code-area response col-md-6">
+			<div class="code-area response col-xs-6 col-md-6">
 				<div class="description">response</div>
 				<pre class="code-wrap">
 				</pre>
