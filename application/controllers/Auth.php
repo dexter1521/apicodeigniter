@@ -3,11 +3,9 @@
 class Auth extends MY_Controller
 {
 
-  protected $ci;
-
   function __construct()
   {
-    parent::__construct($this->ci);
+    parent::__construct();
     $this->load->model('Authorize_model');
   }
 
@@ -39,7 +37,7 @@ class Auth extends MY_Controller
       foreach ($_POST as $key => $value) {
         $message['messages'][$key] = form_error($key);
       }
-      $this->response($message, $message['status']);
+      return $this->response($message, $message['status']);
     } else {
 
       $params = array(
@@ -49,29 +47,32 @@ class Auth extends MY_Controller
 
       $returnData = $this->Authorize_model->getUser($params);
 
-      if ($returnData['bandera'] == false) {
-        # code...
-        $message = array('status' => 200, 'success' => $returnData['bandera'], 'messages' => $returnData['message']);
-        $this->response($message, $message['status']);
+      if ($returnData['activo'] == false) {
+        $message = array(
+          'status' => 200,
+          'success' => $returnData['activo'],
+          'messages' => $returnData['message']
+        );
+
+        return $this->response($message, $message['status']);
       } else {
 
         $date = date("Y-m-d H:i:s", time());
         $CI = &get_instance(); // Aquí obtienes la instancia de CodeIgniter
-        $authorization = new AUTHORIZATION($CI); // Creas una instancia de la clase AUTHORIZATION
 
         $tokenData = array(
           'usuario'       => $returnData['response']['usuario'],
           'nombre'   => $returnData['response']['nombre'],
           'uuid'   => uniqid(),
           'timestamp' => $date,
-          'iat' => time(),
-          'expiration' => time() + ($CI->config->item('token_timeout') * 60),
-          'in_session' => true
+          'expiration' => strtotime($date) + ($CI->config->item('token_expire_time') * 5),
+          'ip' => $CI->input->ip_address()
         );
+        $token = Authorization::generateToken($tokenData);
 
         $message = array(
           'status' => 200, 'success' => true,
-          'Authorization' =>  $authorization->generateToken($tokenData)
+          'Authorization' =>  $token
         );
 
         $this->response($message, $message['status']);
@@ -79,63 +80,50 @@ class Auth extends MY_Controller
     }
   } //termina login
 
-
-  public function logout_post()
-  {
-    $headers = $this->input->request_headers();
-
-    if (array_key_exists('Authorization', $headers) && !empty($headers['Authorization'])) {
-
-      $token = $headers['Authorization'];
-      $decodedToken = Authorization::validateToken($token);
-
-      if ($decodedToken != false) {
-        // Aquí puedes agregar la lógica para cerrar la sesión del usuario
-        // $this->Authorize_model->cerrar_login_model($decodedToken);
-
-        $this->response('adios vaquero!', 200);
-      } else {
-        $this->response('Error de autenticación', 401);
-      }
-    } else {
-
-      $this->response('Token no proporcionado', 401);
-    }
-  }
-
-
   public function tokenRetrieve_post()
   {
+    $message = array('status' => 400, 'success' => false, 'messages' => '');
 
-    $message = array('status' => null, 'success' => false, 'messages' => '');
-
-    #hacemos debug a los headers del navegador
-    $headers = $this->input->request_headers();
-
-    #$headers = $this->input->get_request_header('Authorization');
-
-
-    if (array_key_exists('Authorization', $headers) && !empty($headers['Authorization'])) {
-      $CI = &get_instance(); // Aquí obtienes la instancia de CodeIgniter
-      $authorization = new AUTHORIZATION($CI); // Creas una instancia de la clase AUTHORIZATION
-      $decodedToken = $authorization->validateTimestamp($headers['Authorization']);
-
-      if ($decodedToken != false) {
-        $this->set_response($decodedToken, $message['status']);
-      } else {
-
-        $message['messages'] = 'Token inválido';
-        $this->set_response($message, REST_Controller::HTTP_UNAUTHORIZED);
+    $headers = $this->input->get_request_header('Authorization');
+    if ($headers !== false && !empty($headers)) {
+      $decodedToken = AUTHORIZATION::validateToken($headers);
+      if ($decodedToken !== false) {
+        // Token válido, puedes devolverlo al cliente si es necesario
+        // Obtener la fecha de expiración en formato legible
+        $expiration = date("Y-m-d H:i:s", $decodedToken->expiration);
+        // Agregar la fecha de expiración al array de respuesta
+        $decodedToken->expiration_date = $expiration;
+        $this->set_response($decodedToken, 200);
+        return;
       }
-      
-    } else {
-
-      $message['messages'] = 'Token ausente';
-      $this->set_response($message, REST_Controller::HTTP_UNAUTHORIZED);
-
     }
 
+    // El token no se proporcionó o no es válido
+    $message = array('status' => 401, 'success' => false, 'messages' => 'Token no enviado o inválido');
+    $this->set_response($message, 401);
   }
 
 
+  public function tokenRetrieve_get()
+  {
+    $token = $this->input->get_request_header('Authorization');
+
+    if (!$token) {
+      // No se proporcionó ningún token
+      $this->handleUnauthorizedAccess("No se proporcionó ningún token", parent::HTTP_UNAUTHORIZED);
+      return;
+    }
+
+    // Verificar si el token es válido
+    $decodedToken = AUTHORIZATION::validateToken($token);
+
+    if (!$decodedToken) {
+      // El token proporcionado no es válido o ha expirado
+      $this->handleUnauthorizedAccess("El token proporcionado no es válido o ha expirado", parent::HTTP_UNAUTHORIZED);
+      return;
+    }
+
+    // Token válido, puedes devolverlo al cliente si es necesario
+    $this->set_response($decodedToken, 200);
+  }
 }
