@@ -2,36 +2,27 @@
 
 class AUTHORIZATION
 {
-    protected $CI; // Instance of CodeIgniter (injected through constructor)
-
-    public function __construct($CI)
+    public static function validateTimestamp($token)
     {
-        $this->CI = $CI;
-    }
-
-    public function validateTimestamp($token)
-    {
-        $date = date("Y-m-d h:i:s", time());
-        $token = $this->validateToken($token);
-
-        if ($token != false && (strtotime($date) - strtotime($token->timestamp) < ($this->CI->config->item('token_expire_time') * 60))) {
+        $date = date("Y-m-d H:i:s", time());
+        $CI = &get_instance();
+        $token = self::validateToken($token);
+        if (strtotime($date) < $token->expiration) {
             return $token;
         }
+
         return false;
     }
 
-    public function validateToken($token)
+    public static function validateToken($token)
     {
-        try {
-            return JWT::decode($token, $this->CI->config->item('jwt_key'));
-        } catch (Exception $e) {
-            // Handle decode exception (e.g., return false or throw a specific exception)
-            return false;
-        }
+        $CI = &get_instance();
+        return JWT::decode($token, $CI->config->item('jwt_key'));
     }
 
-    public function generateToken($data)
+    public static function generateToken($data)
     {
-        return JWT::encode($data, $this->CI->config->item('jwt_key'));
+        $CI = &get_instance();
+        return JWT::encode($data, $CI->config->item('jwt_key'));
     }
 }

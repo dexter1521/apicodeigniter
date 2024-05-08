@@ -1,28 +1,22 @@
 <?php
-/*
- * Eduardo Marvil
- * eduardo.dritec@gmail.com
- * 14/02/2023
- * Descripcion: Controlador principal de toda la aplicacion
- * */
+class TokenNotProvidedException extends Exception{}
+class InvalidTokenException extends Exception{}
 
 require APPPATH . 'libraries/REST_Controller.php';
 
 class MY_Controller extends REST_Controller
 {
-    protected $ci;
 
     public function __construct()
     {
         parent::__construct();
-        $this->ci = &get_instance();
         $this->load->helper('jwt');
         $this->load->helper('Authorization');
     }
 
-    protected function handleUnauthorizedAccess($errorMessage)
+    protected function handleUnauthorizedAccess($errorMessage, $errorCode)
     {
-        $this->output->set_status_header(401);
+        $this->output->set_status_header($errorCode);
         $this->output
             ->set_content_type('application/json')
             ->set_output(json_encode(
@@ -33,24 +27,22 @@ class MY_Controller extends REST_Controller
             ));
     }
 
-    public function validateToken($authorizationHeader)
+    protected function validateToken($authorizationHeader)
     {
-        $authorization = new AUTHORIZATION($this->ci); // Crear una instancia de AUTHORIZATION
-        $decodedToken = $this->tokenRetrieve($authorizationHeader, $authorization);
-        if ($decodedToken == false) {
-            throw new Exception('Token inválido');
-        }
-        return $decodedToken;
-    }
+        if (empty($authorizationHeader)) {
 
-    public function tokenRetrieve($authorizationHeader, $authorization)
-    {
-        if (!empty($authorizationHeader)) {
-            $decodedToken = $authorization->validateTimestamp($authorizationHeader); // Llamar al método no estático
-            if ($decodedToken != false) {
-                return $decodedToken;
-            }
+            #throw new Exception("Token no proporcionado");
+            throw new TokenNotProvidedException("Token no proporcionado");
         }
-        return false;
+
+        $decodedToken = Authorization::validateTimestamp($authorizationHeader);
+
+        if ($decodedToken == false) {
+
+            #throw new Exception("Token inválido o ha expirado");
+            throw new InvalidTokenException("Token inválido o ha expirado");
+        }
+
+        return $decodedToken;
     }
 }

@@ -31,7 +31,7 @@ $config['token_header'] = 'token';
 | ( 1 Hour ) : 60 * 60     = 3600
 | ( 1 Minute ) : 60        = 60
 */
-$config['token_expire_time'] = 8400;
+$config['token_expire_time'] = 60;
 
 //$config['token_timeout'] = 400;
 
