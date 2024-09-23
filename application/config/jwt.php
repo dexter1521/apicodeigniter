@@ -33,7 +33,5 @@ $config['token_header'] = 'token';
 */
 $config['token_expire_time'] = 60;
 
-//$config['token_timeout'] = 400;
-
 /* End of file jwt.php */
 /* Location: ./application/config/jwt.php */
