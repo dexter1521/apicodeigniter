@@ -1,28 +1,42 @@
 <?php
 
-class AUTHORIZATION
+class authorization
 {
-    public static function validateTimestamp($token)
-    {
-        $date = date("Y-m-d H:i:s", time());
-        $CI = &get_instance();
-        $token = self::validateToken($token);
-        if (strtotime($date) < $token->expiration) {
-            return $token;
-        }
+	public static function validateTimestamp($token)
+	{
+		$date = time();
+		$CI = &get_instance();
+		$token = self::validateToken($token);
 
-        return false;
-    }
+		if (!$token) {
+			return false;
+		}
 
-    public static function validateToken($token)
-    {
-        $CI = &get_instance();
-        return JWT::decode($token, $CI->config->item('jwt_key'));
-    }
+		// Verifica la fecha de expiración correctamente
+		if ($date < strtotime($token->expiration_date)) {
+			return $token;
+		}
 
-    public static function generateToken($data)
-    {
-        $CI = &get_instance();
-        return JWT::encode($data, $CI->config->item('jwt_key'));
-    }
+		// Si el token ha expirado, devuelve `false`
+		return false;
+	}
+
+	public static function validateToken($token)
+	{
+		$CI = &get_instance();
+		try {
+			// Decodifica el token utilizando el algoritmo HS256
+			$decodedToken = JWT::decode($token, $CI->config->item('jwt_key'));
+			return $decodedToken;
+		} catch (Exception $e) {
+			log_message('error', 'Error al validar el token: ' . $e->getMessage());
+			return false;
+		}
+	}
+
+	public static function generateToken($data)
+	{
+		$CI = &get_instance();
+		return JWT::encode($data, $CI->config->item('jwt_key'));
+	}
 }
