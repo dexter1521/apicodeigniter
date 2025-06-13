@@ -23,18 +23,7 @@ date_default_timezone_set('America/Mexico_City');
 | a PHP script and you can easily do that on your own.
 |
 */
-$config['EnableSSL'] = false;
-if (isset($_SERVER['HTTP_HOST'])) {
-    if ($config['EnableSSL'] == false) {
-        $root = "http://" . $_SERVER['HTTP_HOST'];
-    } else {
-        $root = "https://" . $_SERVER['HTTP_HOST'];
-    }
-    $root .= str_replace(basename($_SERVER['SCRIPT_NAME']), "", $_SERVER['SCRIPT_NAME']);
-} else {
-    $root = '';
-}
-$config['base_url'] = "$root";
+$config['base_url'] = $_ENV['BASE_URL'];
 
 /*
 |--------------------------------------------------------------------------
@@ -149,7 +138,7 @@ $config['subclass_prefix'] = 'MY_';
 | Note: This will NOT disable or override the CodeIgniter-specific
 |	autoloading (application/config/autoload.php)
 */
-$config['composer_autoload'] = FALSE;
+$config['composer_autoload'] = FCPATH . 'vendor/autoload.php';
 
 /*
 |--------------------------------------------------------------------------

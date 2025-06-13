@@ -31,7 +31,8 @@ $config['token_header'] = 'token';
 | ( 1 Hour ) : 60 * 60     = 3600
 | ( 1 Minute ) : 60        = 60
 */
-$config['token_expire_time'] = 60;
+$config['token_expire_time'] = $_ENV['JWT_EXPIRE_TIME'];
+
 
 /* End of file jwt.php */
 /* Location: ./application/config/jwt.php */

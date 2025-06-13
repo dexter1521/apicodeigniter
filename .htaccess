@@ -1,4 +1,34 @@
+# Habilitar reescritura de URL
 RewriteEngine On
+
+# Establecer el directorio base para las reglas de reescritura
+#RewriteBase /
+
+# Redirigir las solicitudes a index.php, excluyendo archivos o directorios existentes
 RewriteCond %{REQUEST_FILENAME} !-f
 RewriteCond %{REQUEST_FILENAME} !-d
-RewriteRule ^(.*)$ index.php/$1 [L]
+RewriteRule ^(.*)$ ./index.php?/$1 [L]
+
+# Prevent access to .env file
+RewriteRule ^\.env$ - [F,L]
+
+# Permitir acceso a index.php
+<Files "index.php">
+    Allow from all
+</Files>
+
+# Compresión GZIP para mejorar la velocidad de carga
+<IfModule mod_deflate.c>
+    AddOutputFilterByType DEFLATE text/plain
+    AddOutputFilterByType DEFLATE text/html
+    AddOutputFilterByType DEFLATE text/xml
+    AddOutputFilterByType DEFLATE text/css
+    AddOutputFilterByType DEFLATE application/xml
+    AddOutputFilterByType DEFLATE application/xhtml+xml
+    AddOutputFilterByType DEFLATE application/rss+xml
+    AddOutputFilterByType DEFLATE application/javascript
+    AddOutputFilterByType DEFLATE application/x-javascript
+</IfModule>
+
+# Establecer la zona horaria predeterminada de PHP
+php_value date.timezone "America/Mazatlan"
