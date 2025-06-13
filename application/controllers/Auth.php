@@ -11,16 +11,42 @@ class Auth extends MY_Controller
 		$this->load->model('Authorize_model');
 	}
 
+	public function index_post()
+	{
+		$this->output
+			->set_content_type('application/json')
+			->set_output(json_encode(
+				array(
+					'status' => 200,
+					'success' => true,
+					'messages' => 'Api Connected Successfully post'
+				)
+			));
+	}
+
+	public function index_get()
+	{
+		$this->output
+			->set_content_type('application/json')
+			->set_output(json_encode(
+				array(
+					'status' => 200,
+					'success' => true,
+					'messages' => 'Api Connected Successfully get'
+				)
+			));
+	}
+
 	public function login_post()
 	{
 
-		$message = array('status' => null, 'success' => false, 'messages' => array());
+		$message = array();
 
 		$config = array(
 			array(
 				'field' => 'usuario',
 				'label' => 'usuario',
-				'rules' => 'required|trim|min_length[3]|max_length[10]'
+				'rules' => 'required|trim|min_length[3]|max_length[50]|valid_email'
 			),
 			array(
 				'field' => 'contrasenia',
@@ -47,15 +73,16 @@ class Auth extends MY_Controller
 				'password' => trim($this->post('contrasenia'))
 			);
 
-			$resultado = $this->Authorize_model->getUser($params);
+			$returnData = $this->Authorize_model->getUser($params);
 
-			if (!$resultado['activo']) {
-				$message = array('status' => 400, 'success' => false, 'messages' => $resultado['message']);
+			if (!$returnData['activo']) {
+				$message = array('status' => 400, 'success' => false, 'messages' => $returnData['message']);
 				return $this->response($message, $message['status']);
 			}
 
 			$date = time();
 			$stampado = date("Y-m-d H:i:s", time());
+
 			$ci = &get_instance();
 			$authorization = new authorization($ci);
 
@@ -66,70 +93,87 @@ class Auth extends MY_Controller
 			}
 
 			$tokenData = array(
-				'usuario'       => $resultado['response']['usuario'],
-				'nombre'   => $resultado['response']['nombre'],
-				'uuid'   => uniqid(),
-				'timestamp' => $stampado,
-				'expiration' => $date + $expirationTimeInSeconds,
+				'id'            => $returnData['response']->id_usuario,
+				'usuario'       => $returnData['response']->usuario,
+				'nombre'        => $returnData['response']->nombre,
+				'correo'        => $returnData['response']->correo,
+				'perfil'        => $returnData['response']->id_perfil,
+				'sucursal'      => $returnData['response']->id_sucursal,
+				'uuid'          => uniqid(),
+				'timestamp'     => $stampado,
+				'expiration'    => $date + $expirationTimeInSeconds,
 				'expiration_date' => date("Y-m-d H:i:s", $date + $expirationTimeInSeconds),
-				'ip' => $CI->input->ip_address()
+				'in_session'    => true,
+				'admin'      => $returnData['response']->admin,
+				//'permisos'      => $returnData['permisos'] //array de permisos del usuario para  aplicar al front
 			);
-			$token = authorization::generateToken($tokenData);
 
-			if (authorization::validateToken($token)) {
-				$message = array('status' => 200, 'success' => true, 'token' => $token);
+			$token = $authorization->generateToken($tokenData);
+
+			if ($authorization->validateToken($token)) {
+				$message = array(
+					'status' => 200,
+					'success' => true,
+					'Authorization' => 'Bearer ' . $token
+				);
 			} else {
-				$message = array('status' => 500, 'success' => false, 'messages' => 'Error generating token');
+				$message = array(
+					'status' => 500,
+					'success' => false,
+					'messages' => 'Error generating token'
+				);
 			}
 
 			$this->response($message, $message['status']);
 		}
 	} //termina login
 
-	public function tokenRetrieve_post()
+	public function logout_post()
 	{
-		$message = array('status' => 400, 'success' => false, 'messages' => '');
+		$headers = $this->input->request_headers();
 
-		$headers = $this->input->get_request_header('Authorization');
-		if ($headers !== false && !empty($headers)) {
-			$decodedToken = AUTHORIZATION::validateToken($headers);
-			if ($decodedToken !== false) {
-				// Token válido, puedes devolverlo al cliente si es necesario
-				// Obtener la fecha de expiración en formato legible
-				$expiration = date("Y-m-d H:i:s", $decodedToken->expiration);
-				// Agregar la fecha de expiración al array de respuesta
-				$decodedToken->expiration_date = $expiration;
-				$this->set_response($decodedToken, 200);
-				return;
+		if (array_key_exists('Authorization', $headers) && !empty($headers['Authorization'])) {
+			$token = $headers['Authorization'];
+			$decodedToken = Authorization::validateToken($token);
+
+			if ($decodedToken != false) {
+				// Aquí puedes agregar la lógica para cerrar la sesión del usuario
+				// $this->Authorize_model->cerrar_login_model($decodedToken);
+
+				$this->response('adios vaquero!', 200);
+			} else {
+				$this->response('Error de autenticación', 401);
 			}
+		} else {
+			$this->response('Token no proporcionado', 401);
 		}
-
-		// El token no se proporcionó o no es válido
-		$message = array('status' => 401, 'success' => false, 'messages' => 'Token no enviado o inválido');
-		$this->set_response($message, 401);
 	}
 
-
-	public function tokenRetrieve_get()
+	public function tokenRetrieve_post()
 	{
-		$token = $this->input->get_request_header('Authorization');
+		$message = array('status' => null, 'success' => false, 'messages' => '');
 
-		if (!$token) {
-			// No se proporcionó ningún token
-			$this->handleUnauthorizedAccess("No se proporcionó ningún token", parent::HTTP_UNAUTHORIZED);
-			return;
+		#hacemos debug a los headers del navegador
+		$headers = $this->input->request_headers();
+
+		#$headers = $this->input->get_request_header('Authorization');
+
+
+		if (array_key_exists('Authorization', $headers) && !empty($headers['Authorization'])) {
+			$CI = &get_instance(); // Aquí obtienes la instancia de CodeIgniter
+			$authorization = new AUTHORIZATION($CI); // Creas una instancia de la clase AUTHORIZATION
+			$decodedToken = $authorization->validateTimestamp($headers['Authorization']);
+
+			if ($decodedToken != false) {
+				$this->set_response($decodedToken, $message['status']);
+			} else {
+
+				$message['messages'] = 'Token inválido';
+				$this->set_response($message, REST_Controller::HTTP_UNAUTHORIZED);
+			}
+		} else {
+			$message['messages'] = 'Token ausente';
+			$this->set_response($message, REST_Controller::HTTP_UNAUTHORIZED);
 		}
-
-		// Verificar si el token es válido
-		$decodedToken = AUTHORIZATION::validateToken($token);
-
-		if (!$decodedToken) {
-			// El token proporcionado no es válido o ha expirado
-			$this->handleUnauthorizedAccess("El token proporcionado no es válido o ha expirado", parent::HTTP_UNAUTHORIZED);
-			return;
-		}
-
-		// Token válido, puedes devolverlo al cliente si es necesario
-		$this->set_response($decodedToken, 200);
 	}
 }

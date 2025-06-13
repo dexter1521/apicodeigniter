@@ -26,6 +26,7 @@ class MY_Controller extends REST_Controller
 		parent::__construct();
 		$this->load->helper(['jwt', 'Authorization']);
 		$this->apiResponse = new IResponse();
+		$this->_checkDatabaseConnection(); // Verificar conexión a la base de datos al iniciar el controlador
 	}
 
 	private function _checkDatabaseConnection()
