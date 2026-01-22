@@ -1,6 +1,6 @@
 <?php
 defined('BASEPATH') or exit('No direct script access allowed');
-date_default_timezone_set('America/Mexico_City');
+date_default_timezone_set(getenv('APP_TIMEZONE') ?: 'America/Mexico_City');
 /*
 |--------------------------------------------------------------------------
 | Base Site URL
@@ -23,7 +23,7 @@ date_default_timezone_set('America/Mexico_City');
 | a PHP script and you can easily do that on your own.
 |
 */
-$config['base_url'] = $_ENV['BASE_URL'];
+$config['base_url'] = isset($_ENV['BASE_URL']) ? rtrim($_ENV['BASE_URL'], '/') . '/' : '';
 
 /*
 |--------------------------------------------------------------------------
@@ -35,7 +35,7 @@ $config['base_url'] = $_ENV['BASE_URL'];
 | variable so that it is blank.
 |
 */
-$config['index_page'] = '';
+$config['index_page'] = isset($_ENV['INDEX_PAGE']) ? $_ENV['INDEX_PAGE'] : '';
 
 /*
 |--------------------------------------------------------------------------
@@ -225,7 +225,7 @@ $config['allow_get_array'] = TRUE;
 | your log files will fill up very fast.
 |
 */
-$config['log_threshold'] = 0;
+$config['log_threshold'] = isset($_ENV['LOG_LEVEL']) ? $_ENV['LOG_LEVEL'] : 0;
 
 /*
 |--------------------------------------------------------------------------

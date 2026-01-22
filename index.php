@@ -41,10 +41,19 @@
  * Cargar el autoloader de Composer
  *
  */
-require_once __DIR__ . '/vendor/autoload.php';
+if (file_exists(__DIR__ . '/vendor/autoload.php')) {
+	require_once __DIR__ . '/vendor/autoload.php';
 
-$dotenv = Dotenv\Dotenv::createImmutable(__DIR__);
-$dotenv->load();
+	if (class_exists('Dotenv\Dotenv')) {
+		try {
+			Dotenv\Dotenv::createImmutable(__DIR__)->load();
+		} catch (Throwable $e) {
+			header('HTTP/1.1 500 Internal Server Error', true, 500);
+			echo 'Error al cargar variables de entorno: ' . htmlspecialchars($e->getMessage(), ENT_QUOTES, 'UTF-8');
+			exit(1);
+		}
+	}
+}
 
 /*
  *---------------------------------------------------------------
@@ -63,7 +72,7 @@ $dotenv->load();
  *
  * NOTE: If you change these, also change the error_reporting() code below
  */
-define('ENVIRONMENT', isset($_SERVER['CI_ENV']) ? $_SERVER['CI_ENV'] : 'development');
+define('ENVIRONMENT', $_ENV['ENVIRONMENT'] ?: (isset($_SERVER['CI_ENV']) ? $_SERVER['CI_ENV'] : 'development'));
 
 /*
  *---------------------------------------------------------------

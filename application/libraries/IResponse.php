@@ -5,8 +5,9 @@ class IResponse implements ResponseInterface
 {
 	private $status = null;
 	private $success = false;
-	private $response = '';
+	private $response = null;
 	private $messages = [];
+	private $errors = [];
 
 	/**
 	 * Establece el estado de la respuesta.
@@ -49,8 +50,16 @@ class IResponse implements ResponseInterface
 	 */
 	public function setMessage($message)
 	{
-		//$this->messages[] = $message;
-		$this->messages = $message;
+		if ($message === null || $message === '') {
+			return;
+		}
+
+		if (is_array($message)) {
+			$this->messages = $message;
+			return;
+		}
+
+		$this->messages = [$message];
 	}
 
 	/**
@@ -62,7 +71,17 @@ class IResponse implements ResponseInterface
 	 */
 	public function setValidationMessage($key, $message)
 	{
-		$this->messages[$key] = $message;
+		$this->errors[$key] = $message;
+	}
+
+	public function addError($key, $message)
+	{
+		$this->errors[$key] = $message;
+	}
+
+	public function setErrors(array $errors)
+	{
+		$this->errors = $errors;
 	}
 
 	/**
@@ -85,18 +104,29 @@ class IResponse implements ResponseInterface
 		return $this->messages;
 	}
 
+	public function getStatus()
+	{
+		return $this->status;
+	}
+
+	public function isSuccess()
+	{
+		return (bool)$this->success;
+	}
+
+	public function getErrors()
+	{
+		return $this->errors;
+	}
+
 	public function toArray()
 	{
-		// Verifica si hay exactamente un mensaje y lo devuelve directamente.
-		// Si hay exactamente un mensaje, no se usa reset() para mantener la estructura de clave-valor.
-		// Asegura que $this->messages es un array antes de contar sus elementos.
-		$messages = is_array($this->messages) && count($this->messages) === 1 ? $this->messages : $this->messages;
-
 		return [
 			'status' => $this->status,
-			'success' => $this->success,
+			'success' => (bool)$this->success,
 			'response' => $this->response,
-			'messages' => $messages,
+			'messages' => $this->messages,
+			'errors' => $this->errors,
 		];
 	}
 }

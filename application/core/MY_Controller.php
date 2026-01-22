@@ -1,4 +1,11 @@
-<?php defined('BASEPATH') or exit('No direct script access allowed');
+<?php
+defined('BASEPATH') or exit('No direct script access allowed');
+/*
+ * Eduardo Marvil
+ * emtv2126@gmail.com
+ * 14/02/2023
+ * Descripcion: Controlador principal de toda la aplicacion
+ * */
 
 // Excepciones personalizadas para manejo de errores de token
 class TokenNotProvidedException extends Exception {}
@@ -6,26 +13,37 @@ class InvalidTokenException extends Exception {}
 
 require APPPATH . 'libraries/REST_Controller.php';
 
+/**
+ * Class MY_Controller
+ *
+ * @property CI_Session $session
+ * @property CI_Loader $load
+ * @property CI_Config $config
+ * @property CI_DB_driver $db
+ * @property CI_DB_query_builder $db
+ * @property CI_Input $input
+ * @property CI_Output $output
+ */
+
 class MY_Controller extends REST_Controller
 {
 	// Definir constantes para mensajes de error
 	private const ERROR_TOKEN_NOT_PROVIDED = "Token no proporcionado o formato inválido en la petición";
-	private const ERROR_INVALID_TOKEN = "Token inválido: ";
 	private const ERROR_TOKEN_EXPIRED = "Token inválido o ha expirado, por favor inicie sesión nuevamente";
 	private const ERROR_INVALID_STATIC_TOKEN = "Token estático inválido o no existe en la base de datos";
 	private const ERROR_INVALID_STATIC_TOKEN_EXPIRED = "Token estático inválido o ha expirado, por favor inicie sesión nuevamente";
 	private const ERROR_INVALID_STATIC_TOKEN_NOT_ACTIVE = "Token estático no activo o no existe en la base de datos";
 	private const ERROR_INVALID_STATIC_TOKEN_NOT_FOUND = "Token estático no encontrado en la base de datos";
+	private const ERROR_USER_NOT_ACTIVE = "Usuario no autorizado o inactivo";
 
-	// Importar la clase IResponse para manejar respuestas de API
 	protected $apiResponse;
+	protected $authenticatedUser = null;
 	private $isConnected = true;
 
 	public function __construct()
 	{
 		parent::__construct();
 		$this->load->helper(['jwt', 'Authorization']);
-		$this->apiResponse = new IResponse();
 		$this->_checkDatabaseConnection(); // Verificar conexión a la base de datos al iniciar el controlador
 	}
 
@@ -38,6 +56,7 @@ class MY_Controller extends REST_Controller
 			$this->isConnected = false; // Si hay un error, asumir que no hay conexión
 		}
 	}
+
 
 	public function index_post()
 	{
@@ -63,68 +82,136 @@ class MY_Controller extends REST_Controller
 
 	protected function handleUnauthorizedAccess($errorMessage, $errorCode)
 	{
-		$this->output->set_status_header($errorCode);
-		$this->output
-			->set_content_type('application/json')
-			->set_output(json_encode(
-				array(
-					'status' => false,
-					'message' => $errorMessage
-				),
-				JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_PRETTY_PRINT
-			));
+		return $this->sendErrorResponse($errorMessage, $errorCode);
 	}
 
-	protected function validateToken($authorizationHeader)
+	protected function requireAuthentication()
 	{
-		if (empty($authorizationHeader)) {
+		if ($this->authenticatedUser !== null) {
+			return true;
+		}
+
+		$tokenData = $this->tokenRetrieve();
+		if ($tokenData === null) {
+			return false;
+		}
+
+		$this->authenticatedUser = $tokenData;
+		return true;
+	}
+
+	protected function getAuthenticatedUser()
+	{
+		if ($this->authenticatedUser === null) {
+			$this->requireAuthentication();
+		}
+
+		return $this->authenticatedUser;
+	}
+
+	protected function sendSuccessResponse($data = null, $message = 'Operación exitosa', $status = REST_Controller::HTTP_OK)
+	{
+		$response = $this->buildApiResponse(true, $status, $message, $data);
+		return $this->response($response, $status);
+	}
+
+	protected function sendErrorResponse($message, $status = REST_Controller::HTTP_BAD_REQUEST, $details = null)
+	{
+		$payload = null;
+		$errors = [];
+
+		if (is_array($details)) {
+			$errors = $details;
+		} elseif ($details !== null) {
+			$payload = $details;
+		}
+
+		$response = $this->buildApiResponse(false, $status, $message, $payload, $errors);
+		return $this->response($response, $status);
+	}
+
+	protected function sendValidationResponse(array $errors, $message = 'Datos inválidos', $status = REST_Controller::HTTP_UNPROCESSABLE_ENTITY)
+	{
+		return $this->sendErrorResponse($message, $status, $errors);
+	}
+
+	private function buildApiResponse($success, $status, $message = null, $payload = null, array $errors = [])
+	{
+		$response = new IResponse();
+		$response->setStatus($status);
+		$response->setSuccess($success);
+
+		if ($payload !== null) {
+			$response->setResponse($payload);
+		}
+
+		if ($message !== null) {
+			$response->setMessage($message);
+		}
+
+		if (!empty($errors)) {
+			$response->setErrors($errors);
+		}
+
+		return $response->toArray();
+	}
+
+	protected function validateToken($tokenValue)
+	{
+		if (empty($tokenValue)) {
 			throw new TokenNotProvidedException(self::ERROR_TOKEN_NOT_PROVIDED);
 		}
 
-		$decodedToken = Authorization::validateTimestamp($authorizationHeader);
+		$decodedToken = Authorization::validateTimestamp($tokenValue);
 		if ($decodedToken === false) {
 			throw new InvalidTokenException(self::ERROR_TOKEN_EXPIRED);
+		}
+
+		$this->load->model('Auth_model');
+		$tokenUserId = $decodedToken->id_usuario ?? null;
+		$enabledRow = $tokenUserId ? $this->Auth_model->UserEnabled($tokenUserId) : null;
+		if (empty($enabledRow) || (int)($enabledRow['enabled'] ?? 0) !== 1) {
+			throw new InvalidTokenException(self::ERROR_USER_NOT_ACTIVE);
 		}
 
 		return $decodedToken;
 	}
 
-	public function tokenRetrieve($headers)
+	public function tokenRetrieve($headers = null)
 	{
-		$headers = $this->input->request_headers();
+		$normalizedHeaders = $this->normalizeHeaders($headers ?? $this->input->request_headers());
 
-		// 1. Primero intentamos con token estático (X-API-KEY)
-		if (isset($headers['X-API-KEY'])) {
-			return $this->validateStaticToken($headers['X-API-KEY']);
-		}
-		// 2. Si no hay token estático, intentamos con el token JWT
 		try {
-			$token = $this->extractTokenFromHeaders($headers);
+			if (is_array($normalizedHeaders) && isset($normalizedHeaders['x-api-key'])) {
+				return $this->validateStaticToken($normalizedHeaders['x-api-key']);
+			}
+
+			$token = $this->extractTokenFromHeaders($normalizedHeaders);
 			return $this->validateToken($token);
-		} catch (TokenNotProvidedException | InvalidTokenException $e) {
-			$this->response(self::ERROR_INVALID_TOKEN . $e->getMessage(), parent::HTTP_CONFLICT);
-			exit();
+		} catch (TokenNotProvidedException $e) {
+			$this->respondTokenFailure($e->getMessage(), REST_Controller::HTTP_UNAUTHORIZED);
+		} catch (InvalidTokenException $e) {
+			$this->respondTokenFailure($e->getMessage(), REST_Controller::HTTP_FORBIDDEN);
 		}
+
+		return null;
 	}
 
 	private function extractTokenFromHeaders($headers)
 	{
 		if (!empty($headers)) {
 			if (is_array($headers)) {
-				// Si el token viene en 'Authorization'
-				if (isset($headers['Authorization'])) {
-					$authHeader = $headers['Authorization'];
+				if (isset($headers['authorization'])) {
+					$authHeader = $headers['authorization'];
 					if (strpos($authHeader, 'Bearer ') === 0) {
 						return substr($authHeader, 7);
 					}
 					return $authHeader;
 				}
-				// Si el token viene en 'token'
 				if (isset($headers['token'])) {
 					return $headers['token'];
 				}
 			} elseif (is_string($headers)) {
-				// Si solo se pasa el token como string directamente
 				if (strpos($headers, 'Bearer ') === 0) {
 					return substr($headers, 7);
 				}
@@ -136,7 +223,7 @@ class MY_Controller extends REST_Controller
 	}
 
 	/**
-	 * Valida token estático contra la base de datos
+	 * Valida token estático emitido a aplicaciones externas contra la base de datos.
 	 */
 	protected function validateStaticToken($token)
 	{
@@ -170,5 +257,24 @@ class MY_Controller extends REST_Controller
 			'app_name' => $token_data->app_name,
 			'auth_type' => 'static_token'
 		];
+	}
+
+	private function normalizeHeaders($headers)
+	{
+		if (!is_array($headers)) {
+			return $headers;
+		}
+
+		$normalized = [];
+		foreach ($headers as $key => $value) {
+			$normalized[strtolower($key)] = $value;
+		}
+
+		return $normalized;
+	}
+
+	private function respondTokenFailure($message, $statusCode)
+	{
+		return $this->sendErrorResponse($message, $statusCode, ['path' => $this->uri->uri_string()]);
 	}
 }

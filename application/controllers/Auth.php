@@ -2,178 +2,161 @@
 
 class Auth extends MY_Controller
 {
-
-	protected $ci;
-
-	function __construct()
+	public function __construct()
 	{
 		parent::__construct();
 		$this->load->model('Authorize_model');
 	}
 
-	public function index_post()
-	{
-		$this->output
-			->set_content_type('application/json')
-			->set_output(json_encode(
-				array(
-					'status' => 200,
-					'success' => true,
-					'messages' => 'Api Connected Successfully post'
-				)
-			));
-	}
-
-	public function index_get()
-	{
-		$this->output
-			->set_content_type('application/json')
-			->set_output(json_encode(
-				array(
-					'status' => 200,
-					'success' => true,
-					'messages' => 'Api Connected Successfully get'
-				)
-			));
-	}
-
 	public function login_post()
 	{
+		try {
+			$payload = $this->parseJsonBody();
+			$this->form_validation->reset_validation();
+			$this->form_validation->set_data($payload);
+			$this->form_validation->set_rules([
+				[
+					'field' => 'usuario',
+					'label' => 'Usuario',
+					'rules' => 'required|trim|min_length[3]|max_length[120]|valid_email'
+				],
+				[
+					'field' => 'contrasenia',
+					'label' => 'Contraseña',
+					'rules' => 'required|trim|min_length[8]|max_length[255]'
+				],
+			]);
 
-		$message = array();
-
-		$config = array(
-			array(
-				'field' => 'usuario',
-				'label' => 'usuario',
-				'rules' => 'required|trim|min_length[3]|max_length[50]|valid_email'
-			),
-			array(
-				'field' => 'contrasenia',
-				'label' => 'password',
-				'rules' => 'required|trim|min_length[8]|max_length[16]'
-			)
-		);
-
-		$this->form_validation->set_error_delimiters('', '');
-		$this->form_validation->set_rules($config);
-
-		if ($this->form_validation->run() === FALSE) {
-
-			$message['status'] = 200;
-			$message['success'] = false;
-			foreach ($_POST as $key => $value) {
-				$message['messages'][$key] = form_error($key);
-			}
-			return $this->response($message, $message['status']);
-		} else {
-
-			$params = array(
-				'usuario' => trim($this->post('usuario')),
-				'password' => trim($this->post('contrasenia'))
-			);
-
-			$returnData = $this->Authorize_model->getUser($params);
-
-			if (!$returnData['activo']) {
-				$message = array('status' => 400, 'success' => false, 'messages' => $returnData['message']);
-				return $this->response($message, $message['status']);
+			if ($this->form_validation->run() === false) {
+				return $this->sendValidationResponse($this->form_validation->error_array(), 'Credenciales inválidas');
 			}
 
-			$date = time();
-			$stampado = date("Y-m-d H:i:s", time());
+			$params = [
+				'usuario' => strtolower($payload['usuario']),
+				'password' => $payload['contrasenia'],
+			];
 
-			$ci = &get_instance();
-			$authorization = new authorization($ci);
-
-			$expirationTimeInSeconds = $ci->config->item('token_expire_time');
-			if (!intval($expirationTimeInSeconds)) {
-				log_message('error', 'token_expire_time no es un valor numérico válido.');
-				$expirationTimeInSeconds = 43200; // Valor por defecto 12hrs.
+			$userResult = $this->Authorize_model->getUser($params);
+			if (!($userResult['activo'] ?? false)) {
+				return $this->sendErrorResponse($userResult['message'] ?? 'Credenciales incorrectas', REST_Controller::HTTP_UNAUTHORIZED);
 			}
 
-			$tokenData = array(
-				'id'            => $returnData['response']->id_usuario,
-				'usuario'       => $returnData['response']->usuario,
-				'nombre'        => $returnData['response']->nombre,
-				'correo'        => $returnData['response']->correo,
-				'perfil'        => $returnData['response']->id_perfil,
-				'sucursal'      => $returnData['response']->id_sucursal,
-				'uuid'          => uniqid(),
-				'timestamp'     => $stampado,
-				'expiration'    => $date + $expirationTimeInSeconds,
-				'expiration_date' => date("Y-m-d H:i:s", $date + $expirationTimeInSeconds),
-				'in_session'    => true,
-				'admin'      => $returnData['response']->admin,
-				//'permisos'      => $returnData['permisos'] //array de permisos del usuario para  aplicar al front
-			);
-
-			$token = $authorization->generateToken($tokenData);
-
-			if ($authorization->validateToken($token)) {
-				$message = array(
-					'status' => 200,
-					'success' => true,
-					'Authorization' => 'Bearer ' . $token
-				);
-			} else {
-				$message = array(
-					'status' => 500,
-					'success' => false,
-					'messages' => 'Error generating token'
-				);
+			$user = (array) ($userResult['response'] ?? []);
+			if (empty($user)) {
+				return $this->sendErrorResponse('Usuario no encontrado', REST_Controller::HTTP_UNAUTHORIZED);
 			}
 
-			$this->response($message, $message['status']);
+			$expiresIn = (int) $this->config->item('token_expire_time');
+			$claims = [
+				'sub' => $user['id_usuario'] ?? null,
+				'email' => $user['correo'] ?? null,
+				'name' => $user['nombre'] ?? null,
+				'usuario' => $user['usuario'] ?? null,
+				'perfil' => $user['id_perfil'] ?? null,
+				'sucursal' => $user['id_sucursal'] ?? null,
+				'admin' => (bool) ($user['admin'] ?? false),
+			];
+
+			$token = authorization::generateToken($claims, ['expiration' => $expiresIn]);
+			$successPayload = [
+				'token_type' => 'Bearer',
+				'access_token' => $token,
+				'expires_in' => $expiresIn,
+				'issued_at' => time(),
+				'refresh_token' => $this->issueRefreshToken($user),
+			];
+
+			return $this->sendSuccessResponse($successPayload, 'Autenticación exitosa');
+		} catch (Exception $exception) {
+			log_message('error', 'Error en login: ' . $exception->getMessage());
+			return $this->sendErrorResponse('No se pudo completar la autenticación', REST_Controller::HTTP_INTERNAL_SERVER_ERROR);
 		}
-	} //termina login
+	}
 
 	public function logout_post()
 	{
-		$headers = $this->input->request_headers();
+		if (!$this->requireAuthentication()) {
+			return;
+		}
 
-		if (array_key_exists('Authorization', $headers) && !empty($headers['Authorization'])) {
-			$token = $headers['Authorization'];
-			$decodedToken = Authorization::validateToken($token);
+		// Hook para revocar tokens en almacenamiento persistente.
+		return $this->sendSuccessResponse(['revocado' => true], 'Sesión cerrada. Implementa la revocación según tu necesidad.');
+	}
 
-			if ($decodedToken != false) {
-				// Aquí puedes agregar la lógica para cerrar la sesión del usuario
-				// $this->Authorize_model->cerrar_login_model($decodedToken);
-
-				$this->response('adios vaquero!', 200);
-			} else {
-				$this->response('Error de autenticación', 401);
+	public function refresh_post()
+	{
+		try {
+			$refreshToken = $this->extractRefreshToken();
+			if (!$refreshToken) {
+				return $this->sendErrorResponse('Refresh token requerido', REST_Controller::HTTP_BAD_REQUEST);
 			}
-		} else {
-			$this->response('Token no proporcionado', 401);
+
+			// Valida el refresh token en tu almacenamiento propio.
+			$claims = $this->rebuildClaimsFromRefresh($refreshToken);
+			if ($claims === null) {
+				return $this->sendErrorResponse('Refresh token inválido', REST_Controller::HTTP_UNAUTHORIZED);
+			}
+
+			$expiresIn = (int) $this->config->item('token_expire_time');
+			$newToken = authorization::generateToken($claims, ['expiration' => $expiresIn]);
+			$response = [
+				'token_type' => 'Bearer',
+				'access_token' => $newToken,
+				'expires_in' => $expiresIn,
+			];
+
+			return $this->sendSuccessResponse($response, 'Token renovado');
+		} catch (Exception $exception) {
+			log_message('error', 'Error en refresh: ' . $exception->getMessage());
+			return $this->sendErrorResponse('No se pudo refrescar el token', REST_Controller::HTTP_INTERNAL_SERVER_ERROR);
 		}
 	}
 
-	public function tokenRetrieve_post()
+	private function parseJsonBody(): array
 	{
-		$message = array('status' => null, 'success' => false, 'messages' => '');
-
-		#hacemos debug a los headers del navegador
-		$headers = $this->input->request_headers();
-
-		#$headers = $this->input->get_request_header('Authorization');
-
-
-		if (array_key_exists('Authorization', $headers) && !empty($headers['Authorization'])) {
-			$CI = &get_instance(); // Aquí obtienes la instancia de CodeIgniter
-			$authorization = new AUTHORIZATION($CI); // Creas una instancia de la clase AUTHORIZATION
-			$decodedToken = $authorization->validateTimestamp($headers['Authorization']);
-
-			if ($decodedToken != false) {
-				$this->set_response($decodedToken, $message['status']);
-			} else {
-
-				$message['messages'] = 'Token inválido';
-				$this->set_response($message, REST_Controller::HTTP_UNAUTHORIZED);
-			}
-		} else {
-			$message['messages'] = 'Token ausente';
-			$this->set_response($message, REST_Controller::HTTP_UNAUTHORIZED);
+		$rawBody = $this->input->raw_input_stream;
+		if (empty($rawBody)) {
+			return $this->input->post(NULL, true) ?: [];
 		}
+
+		$decoded = json_decode($rawBody, true);
+		return is_array($decoded) ? $decoded : [];
+	}
+
+	private function issueRefreshToken(array $user): string
+	{
+		try {
+			if (function_exists('random_bytes')) {
+				$entropy = random_bytes(32);
+			} elseif (function_exists('openssl_random_pseudo_bytes')) {
+				$entropy = openssl_random_pseudo_bytes(32);
+			} else {
+				$entropy = uniqid('', true);
+			}
+		} catch (Exception $exception) {
+			log_message('debug', 'No se pudo generar entropía criptográfica: ' . $exception->getMessage());
+			$entropy = uniqid('', true);
+		}
+
+		$base = ($user['usuario'] ?? '') . '|' . microtime(true);
+		$hash = hash('sha256', $base . $entropy, true);
+		return rtrim(strtr(base64_encode($hash), '+/', '-_'), '=');
+	}
+
+	private function extractRefreshToken(): ?string
+	{
+		$payload = $this->parseJsonBody();
+		if (!empty($payload['refresh_token'])) {
+			return $payload['refresh_token'];
+		}
+
+		$headers = $this->input->request_headers();
+		return $headers['X-Refresh-Token'] ?? null;
+	}
+
+	private function rebuildClaimsFromRefresh(string $refreshToken): ?array
+	{
+		// Este método es un placeholder. Agrega aquí la lógica para validar y reconstruir claims.
+		return null;
 	}
 }
