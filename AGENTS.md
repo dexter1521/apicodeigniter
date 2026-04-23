@@ -100,13 +100,13 @@ Enfoque senior: Priorizamos seguridad (JWT robusto, rate limiting), escalabilida
 - **Uso**: `Auth.php` delega emisión y revocación a este servicio.
 - **Mejores Prácticas Senior**: Centralizar la lógica de refresh/revoke evita duplicar reglas de negocio.
 
-### 8. Agente JWT (JWT Helper)
-- **Archivo**: `application/helpers/jwt_helper.php`
-- **Funcionalidad**: Utilitarios para encode/decode JWT.
-- **Funciones**: `jwt_encode($payload)`, `jwt_decode($token)`.
-- **Dependencias**: `firebase/php-jwt`.
-- **Mejores Prácticas Senior**: Validar issuer/audience. Usar RS256 en producción (asimétrico).
+### 8. Agente de Rate Limiting (RateLimit)
+- **Archivo**: `application/libraries/RateLimit.php`
+- **Funcionalidad**: Controla la velocidad de acceso, previene brute force y protege endpoints críticos.
+- **Uso**: `Auth.php` usa rate limiting para login; `Static_token_auth.php` usa rate limiting para tokens estáticos.
+- **Mejores Prácticas Senior**: Registrar contadores por identificador y endpoint; limpiar registros expirados periódicamente.
 
+### 9. Agente JWT (JWT Helper)
 - **Archivo**: `application/helpers/jwt_helper.php`
 - **Funcionalidad**: Utilitarios para encode/decode JWT.
 - **Funciones**: `jwt_encode($payload)`, `jwt_decode($token)`.

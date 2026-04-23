@@ -31,6 +31,7 @@ apicodeigniter/
 │   │   ├── Jwt_auth.php          # 🎯 VALIDACIÓN JWT REUTILIZABLE
 │   │   ├── Static_token_auth.php # 🎯 VALIDACIÓN DE API KEYS / TOKENS ESTÁTICOS
 │   │   ├── Token_service.php     # 🎯 CICLO DE VIDA DE REFRESH/LOGOUT
+│   │   ├── RateLimit.php         # 🎯 CONTROL DE RATE LIMITING
 │   │   └── REST_Controller.php   # Framework REST base
 │   ├── models/
 │   │   ├── General_model.php     # Modelo base con operaciones CRUD
@@ -93,6 +94,7 @@ curl -X GET http://localhost:8000/clientes/lista \
 - `Auth.php` usa `Token_service` para emisión, validación de refresh y revocación.
 - `Jwt_auth.php` valida tokens JWT firmados y usuarios activos.
 - `Static_token_auth.php` valida claves estáticas (`X-API-KEY`) con rate limiting.
+- `RateLimit.php` centraliza las reglas de velocidad para login, API keys y endpoints críticos.
 
 
 ### **Controlador Clientes** (Ejemplo incluido):

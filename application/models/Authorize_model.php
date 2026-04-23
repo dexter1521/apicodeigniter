@@ -35,4 +35,19 @@ class Authorize_model extends CI_Model
             return $msg = array('activo' => false, 'message' => 'No existen registros con el usuario proporcionado');
         }
     }
+
+    public function isUserEnabledById($userId)
+    {
+        $this->db->select('activo');
+        $this->db->from('usuarios');
+        $this->db->where('id_usuario', $userId);
+        $query = $this->db->get();
+
+        if ($query->num_rows() !== 1) {
+            return false;
+        }
+
+        $row = $query->row_array();
+        return isset($row['activo']) && (int) $row['activo'] === 1;
+    }
 }
