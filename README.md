@@ -5,6 +5,7 @@ Este proyecto proporciona una **plantilla completa y robusta** para construir AP
 ## ✨ Características Principales
 
 - 🔐 **Autenticación JWT** completa con validación automática
+- 🔐 **Gestión de tokens centralizada** con `Token_service`, `Jwt_auth` y `Static_token_auth`
 - 🎯 **Controlador base centralizado** (`MY_Controller`) con todos los métodos helper
 - 📊 **Sistema de respuestas estandarizado** (`IResponse`) 
 - 🛠️ **CRUD completo de ejemplo** (Controlador Clientes)
@@ -27,6 +28,9 @@ apicodeigniter/
 │   │   └── MY_Controller.php     # 🎯 CONTROLADOR BASE (todos heredan de aquí)
 │   ├── libraries/
 │   │   ├── IResponse.php         # 🎯 RESPUESTAS ESTANDARIZADAS
+│   │   ├── Jwt_auth.php          # 🎯 VALIDACIÓN JWT REUTILIZABLE
+│   │   ├── Static_token_auth.php # 🎯 VALIDACIÓN DE API KEYS / TOKENS ESTÁTICOS
+│   │   ├── Token_service.php     # 🎯 CICLO DE VIDA DE REFRESH/LOGOUT
 │   │   └── REST_Controller.php   # Framework REST base
 │   ├── models/
 │   │   ├── General_model.php     # Modelo base con operaciones CRUD
@@ -84,6 +88,12 @@ curl -X GET http://localhost:8000/clientes/lista \
 ```
 
 ## 🎯 Ejemplo de Uso Completo
+
+### 🧩 Arquitectura de Autenticación
+- `Auth.php` usa `Token_service` para emisión, validación de refresh y revocación.
+- `Jwt_auth.php` valida tokens JWT firmados y usuarios activos.
+- `Static_token_auth.php` valida claves estáticas (`X-API-KEY`) con rate limiting.
+
 
 ### **Controlador Clientes** (Ejemplo incluido):
 
