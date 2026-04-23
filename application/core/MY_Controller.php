@@ -138,22 +138,22 @@ class MY_Controller extends REST_Controller
 	private function buildApiResponse($success, $status, $message = null, $payload = null, array $errors = [])
 	{
 		$response = new IResponse();
-		$response->setStatus($status);
-		$response->setSuccess($success);
+		$response->setStatus($status)
+			->setSuccess($success)
+			->setTimestamp()
+			->setRequestId(uniqid('req_', true));
 
 		if ($payload !== null) {
 			$response->setResponse($payload);
 		}
-
 		if ($message !== null) {
 			$response->setMessage($message);
 		}
-
 		if (!empty($errors)) {
 			$response->setErrors($errors);
 		}
 
-		return $response->toArray();
+		return $response->toArray(false); // Omitir campos vacíos para payloads más limpios
 	}
 
 	protected function validateToken($tokenValue)
@@ -162,16 +162,10 @@ class MY_Controller extends REST_Controller
 			throw new TokenNotProvidedException(self::ERROR_TOKEN_NOT_PROVIDED);
 		}
 
-		$decodedToken = Authorization::validateTimestamp($tokenValue);
+		$this->load->library('Jwt_auth');
+		$decodedToken = $this->jwt_auth->validate($tokenValue);
 		if ($decodedToken === false) {
 			throw new InvalidTokenException(self::ERROR_TOKEN_EXPIRED);
-		}
-
-		$this->load->model('Auth_model');
-		$tokenUserId = $decodedToken->id_usuario ?? null;
-		$enabledRow = $tokenUserId ? $this->Auth_model->UserEnabled($tokenUserId) : null;
-		if (empty($enabledRow) || (int)($enabledRow['enabled'] ?? 0) !== 1) {
-			throw new InvalidTokenException(self::ERROR_USER_NOT_ACTIVE);
 		}
 
 		return $decodedToken;
@@ -231,32 +225,14 @@ class MY_Controller extends REST_Controller
 			throw new TokenNotProvidedException(self::ERROR_TOKEN_NOT_PROVIDED);
 		}
 
-		$this->db->where('token', $token);
-		$this->db->where('is_active', 1);
-		$query = $this->db->get('api_tokens');
+		$this->load->library('Static_token_auth');
+		$tokenInfo = $this->static_token_auth->validate($token);
 
-		if ($query->num_rows() === 0) {
+		if ($tokenInfo === false) {
 			throw new InvalidTokenException(self::ERROR_INVALID_STATIC_TOKEN);
 		}
 
-		$token_data = $query->row();
-
-		// Opcional: Verificar fecha de expiración si existe
-		if (
-			isset($token_data->expires_at) && $token_data->expires_at
-			&& strtotime($token_data->expires_at) < time()
-		) {
-			throw new InvalidTokenException(self::ERROR_INVALID_STATIC_TOKEN_EXPIRED);
-		}
-
-		// Actualizar última fecha de uso
-		$this->db->where('id', $token_data->id)
-			->update('api_tokens', ['last_used_at' => date('Y-m-d H:i:s')]);
-
-		return (object)[
-			'app_name' => $token_data->app_name,
-			'auth_type' => 'static_token'
-		];
+		return $tokenInfo;
 	}
 
 	private function normalizeHeaders($headers)
