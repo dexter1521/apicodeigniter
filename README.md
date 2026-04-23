@@ -5,7 +5,8 @@ Este proyecto proporciona una **plantilla completa y robusta** para construir AP
 ## ✨ Características Principales
 
 - 🔐 **Autenticación JWT** completa con validación automática
-- 🔐 **Gestión de tokens centralizada** con `Token_service`, `Jwt_auth` y `Static_token_auth`
+- �️ **Dependencias actualizadas** para seguridad: `doctrine/annotations` 2.0.2, `tecnickcom/tcpdf` 6.11.3, `zircote/swagger-php` 5.8.3
+- �🔐 **Gestión de tokens centralizada** con `Token_service`, `Jwt_auth` y `Static_token_auth`
 - 🎯 **Controlador base centralizado** (`MY_Controller`) con todos los métodos helper
 - 📊 **Sistema de respuestas estandarizado** (`IResponse`) 
 - 🛠️ **CRUD completo de ejemplo** (Controlador Clientes)

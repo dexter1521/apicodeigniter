@@ -231,6 +231,13 @@ const LOGIN_RATE_WINDOW = 900;     // ventana de 15 minutos
 19. Sesión terminada
 ```
 
+## Dependencias actualizadas
+- `doctrine/annotations` 2.0.2
+- `tecnickcom/tcpdf` 6.11.3
+- `zircote/swagger-php` 5.8.3
+
+Se actualizaron estas dependencias para reducir la exposición a vulnerabilidades conocidas y mantener la plantilla actualizada. Si se detecta una dependencia abandonada o vulnerable adicional, se debe revisar el árbol completo de Composer.
+
 ### Para Apps Terceros (API Keys):
 ```
 1. App obtiene token estático (x-api-key) del admin
